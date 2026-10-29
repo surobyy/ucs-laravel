@@ -19,8 +19,10 @@
             --line: #cddad7;
             --accent: #0e7c7b;
             --accent-ink: #ffffff;
-            --route: #e0900f;
+            --route: #22c55e;
+            --route-soft: #dcfce7;
             --bad: #b3261e;
+            --reject: #dc2626;
             --soft: #f3f8f7;
             --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
             --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
@@ -36,8 +38,9 @@
                 --line: #26424a;
                 --accent: #3cc4c0;
                 --accent-ink: #062326;
-                --route: #f5b23d;
-                --bad: #ff8a80;
+                --route: #4ade80;
+                --route-soft: #143223;
+                --reject: #f87171;
                 --soft: #102226;
             }
         }
@@ -216,6 +219,14 @@
             background: var(--route);
         }
 
+        .legend .l-queue::before {
+            background: var(--reject);
+            width: 22px;
+            height: 4px;
+            border-radius: 2px;
+            opacity: .9;
+        }
+
         .legend .l-node::before {
             width: 12px;
             height: 12px;
@@ -226,12 +237,22 @@
         .e {
             stroke: var(--line);
             stroke-width: 2;
+            stroke-dasharray: 8 7;
         }
 
         .e.on {
             stroke: var(--route);
             stroke-width: 5;
             stroke-linecap: round;
+            stroke-dasharray: 0;
+        }
+
+        .e.reject {
+            stroke: var(--reject);
+            stroke-width: 3.5;
+            stroke-linecap: round;
+            stroke-dasharray: 8 7;
+            opacity: .9;
         }
 
         .w {
@@ -244,6 +265,11 @@
 
         .w.on {
             fill: var(--ink);
+            font-weight: 700;
+        }
+
+        .w.reject {
+            fill: var(--reject);
             font-weight: 700;
         }
 
@@ -260,15 +286,12 @@
 
         .n.on rect {
             stroke: var(--route);
+            fill: var(--route-soft);
         }
 
         .n.start rect {
             fill: var(--accent);
             stroke: var(--accent);
-        }
-
-        .n.start text {
-            fill: var(--accent-ink);
         }
 
         .n.goal rect {
@@ -386,21 +409,21 @@
     <div class="wrap">
         <header>
             <h1>Uniform Cost Search</h1>
-            <p>Temukan jalur dengan total biaya paling kecil di antara dua node. Ubah graf di sebelah kiri dan
+            <p>Temukan jalur dengan total biaya paling kecil di antara dua titik. Ubah graf di sebelah kiri dan
                 pratinjaunya langsung berubah.</p>
         </header>
 
         <div class="layout">
             <form method="POST" action="{{ route('ucs') }}">
                 @csrf
-                <label>Sisi graf
-                    <span class="hint">Satu baris per sisi: NodeA,NodeB,biaya. Berlaku dua arah.</span>
+                <label>Jalur / hubungan
+                    <span class="hint">Satu baris per hubungan: TitikA,TitikB,biaya. Berlaku dua arah.</span>
                     <textarea id="edges" name="edges" spellcheck="false" required>{{ old('edges', $edges) }}</textarea>
                 </label>
                 <div class="pair">
-                    <label>Node awal <input id="start" name="start" value="{{ old('start', $start) }}"
+                    <label>Titik awal <input id="start" name="start" value="{{ old('start', $start) }}"
                             required></label>
-                    <label>Node tujuan <input id="goal" name="goal" value="{{ old('goal', $goal) }}"
+                    <label>Titik tujuan <input id="goal" name="goal" value="{{ old('goal', $goal) }}"
                             required></label>
                 </div>
                 @if ($errors->any())
@@ -429,7 +452,7 @@
                                     biaya</small></div>
                         @else
                             <strong>Tidak ada jalur</strong> dari {{ $start }} ke {{ $goal }}. Periksa
-                            apakah kedua node saling terhubung.
+                            apakah kedua titik saling terhubung.
                         @endif
                     </div>
                 @endif
@@ -439,8 +462,9 @@
                     <div class="graph-box"><svg id="graph" viewBox="0 0 700 440" role="img"
                             aria-label="Visualisasi graf"></svg></div>
                     <div class="legend">
-                        <span class="l-route">Jalur terpilih</span>
-                        <span class="l-node">Angka kecil = urutan ekspansi</span>
+                        <span class="l-route">Jalur terbaik</span>
+                        <span class="l-queue">Antrean yang tidak dipilih</span>
+                        <span class="l-node">Angka kecil = urutan pengecekan</span>
                     </div>
                 </div>
 
@@ -452,9 +476,9 @@
                                 <thead>
                                     <tr>
                                         <th>Langkah</th>
-                                        <th>Node diekspansi</th>
+                                        <th>Titik yang dicek</th>
                                         <th>g(n)</th>
-                                        <th>Sisa antrean (frontier)</th>
+                                        <th>Sisa antrean yang belum dipilih</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -536,15 +560,16 @@
                     gNodes = el('g');
                 edges.forEach(([a, b, c]) => {
                     const on = onPath.has([a, b].sort().join('|'));
+                    const cls = 'e' + (showResult ? (on ? ' on' : ' reject') : '');
                     gEdges.appendChild(el('line', {
-                        class: 'e' + (on ? ' on' : ''),
+                        class: cls,
                         x1: pos[a].x,
                         y1: pos[a].y,
                         x2: pos[b].x,
                         y2: pos[b].y
                     }));
                     gLabels.appendChild(el('text', {
-                        class: 'w' + (on ? ' on' : ''),
+                        class: 'w' + (showResult ? (on ? ' on' : ' reject') : ''),
                         x: (pos[a].x + pos[b].x) / 2,
                         y: (pos[a].y + pos[b].y) / 2 + 4,
                         'text-anchor': 'middle'
@@ -595,7 +620,6 @@
                 svg.append(gEdges, gLabels, gNodes);
             }
 
-            // Setelah graf/node diubah, hasil lama tidak relevan lagi: hilangkan sorotan.
             [$edges, $start, $goal].forEach(i => i.addEventListener('input', () => {
                 showResult = false;
                 render();
