@@ -23,6 +23,7 @@
             --route-soft: #dcfce7;
             --bad: #b3261e;
             --reject: #dc2626;
+            --reject-soft: #fee2e2;
             --soft: #f3f8f7;
             --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
             --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
@@ -41,6 +42,7 @@
                 --route: #4ade80;
                 --route-soft: #143223;
                 --reject: #f87171;
+                --reject-soft: #4a1920;
                 --soft: #102226;
             }
         }
@@ -284,6 +286,15 @@
             font: 600 13px var(--body);
         }
 
+        .n.reject rect {
+            fill: var(--reject-soft);
+            stroke: var(--reject);
+        }
+
+        .n.reject text {
+            fill: var(--reject);
+        }
+
         .n.on rect {
             stroke: var(--route);
             fill: var(--route-soft);
@@ -292,6 +303,10 @@
         .n.start rect {
             fill: var(--accent);
             stroke: var(--accent);
+        }
+
+        .n.start text {
+            fill: var(--accent-ink);
         }
 
         .n.goal rect {
@@ -462,8 +477,8 @@
                     <div class="graph-box"><svg id="graph" viewBox="0 0 700 440" role="img"
                             aria-label="Visualisasi graf"></svg></div>
                     <div class="legend">
-                        <span class="l-route">Jalur terbaik</span>
-                        <span class="l-queue">Antrean yang tidak dipilih</span>
+                        <span class="l-route">Jalur berhasil</span>
+                        <span class="l-queue">Titik yang dicek</span>
                         <span class="l-node">Angka kecil = urutan pengecekan</span>
                     </div>
                 </div>
@@ -551,16 +566,24 @@
                     };
                 });
 
+                const pathSet = new Set(PATH);
+                const checkedSet = new Set(ORDER.filter(n => !pathSet.has(n)));
                 const onPath = new Set();
-                if (showResult)
-                    for (let i = 0; i < PATH.length - 1; i++) onPath.add([PATH[i], PATH[i + 1]].sort().join('|'));
+                if (showResult) {
+                    for (let i = 0; i < PATH.length - 1; i++) {
+                        const key = [PATH[i], PATH[i + 1]].sort().join('|');
+                        onPath.add(key);
+                    }
+                }
 
                 const gEdges = el('g'),
                     gLabels = el('g'),
                     gNodes = el('g');
                 edges.forEach(([a, b, c]) => {
-                    const on = onPath.has([a, b].sort().join('|'));
-                    const cls = 'e' + (showResult ? (on ? ' on' : ' reject') : '');
+                    const key = [a, b].sort().join('|');
+                    const on = onPath.has(key);
+                    const checked = showResult && (checkedSet.has(a) || checkedSet.has(b));
+                    const cls = showResult ? (on ? 'e on' : checked ? 'e reject' : 'e') : 'e';
                     gEdges.appendChild(el('line', {
                         class: cls,
                         x1: pos[a].x,
@@ -569,7 +592,7 @@
                         y2: pos[b].y
                     }));
                     gLabels.appendChild(el('text', {
-                        class: 'w' + (showResult ? (on ? ' on' : ' reject') : ''),
+                        class: showResult ? (on ? 'w on' : checked ? 'w reject' : 'w') : 'w',
                         x: (pos[a].x + pos[b].x) / 2,
                         y: (pos[a].y + pos[b].y) / 2 + 4,
                         'text-anchor': 'middle'
@@ -583,6 +606,7 @@
                         h = 30;
                     let cls = 'n';
                     if (showResult && PATH.includes(n)) cls += ' on';
+                    else if (showResult && checkedSet.has(n)) cls += ' reject';
                     if (n === start) cls += ' start';
                     else if (n === goal) cls += ' goal';
                     const g = el('g', {
